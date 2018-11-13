@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Text;
+using System.Linq;
 using System.Threading;
 using static ProjectCore._Common;
 
@@ -60,11 +60,17 @@ namespace ProjectCore
                 case REQUEST_CODES.GET_RESULT:
                     SendResult(requestPacket, listCtxt.Response);
                     break;
+                case REQUEST_CODES.GET_TASK:
+                    SendTask(requestPacket, listCtxt.Response);
+                    break;
+                case REQUEST_CODES.SUBMIT_RESULT:
+                    StoreResult(requestPacket, listCtxt.Response);
+                    break;
                 case REQUEST_CODES.STATUS:
                     UpdateStatus(requestPacket, listCtxt.Response);
                     break;
                 case REQUEST_CODES.UNREGISTER_CLIENT:
-                    UnregisterClient(requestPacket, listCtxt.Response);
+                    UnregisterClient(listCtxt.Request, listCtxt.Response);
                     break;
                 case REQUEST_CODES.UNREGISTER_ASSEMBLY:
                     UnregisterAssembly(requestPacket, listCtxt.Response);
@@ -72,14 +78,79 @@ namespace ProjectCore
             }
         }
 
-        private void UnregisterAssembly(RequestPacket requestPacket, HttpListenerResponse response)
+        private void StoreResult(RequestPacket requestPacket, HttpListenerResponse response)
         {
-            throw new NotImplementedException();
+            bool errored = false;
+            if (nodeList.ContainsValue(requestPacket.Node))
+            {
+                resultStore.Add(requestPacket.Result.TaskId, requestPacket.Result.ResultData);
+            }
+            else
+                errored = true;
+
+            ResponsePacket resPacket = new ResponsePacket()
+            {
+                DateTimeStamp = DateTime.Now,
+                Code = RESPONSE_CODES.SUBMIT_RESULT_ACK,
+                Errored = errored
+            };
+            _Common.WriteResPacketToResponse(resPacket, response);
         }
 
-        private void UnregisterClient(RequestPacket requestPacket, HttpListenerResponse response)
+        private void SendTask(RequestPacket requestPacket, HttpListenerResponse response)
         {
-            throw new NotImplementedException();
+            bool errored = false;
+            Task task = new Task();
+            string taskId = string.Empty;
+            lock (taskStore)
+            {
+                if (taskStore.Where(x => x.Value.RequestingNode != requestPacket.Node).Count() > 0)
+                {
+                    taskId = taskStore.First(x => x.Value.RequestingNode != requestPacket.Node).Key;
+                    task = taskStore[taskId];
+                }
+                else
+                    errored = true;
+
+                ResponsePacket resPacket = new ResponsePacket()
+                {
+                    DateTimeStamp = DateTime.Now,
+                    Code = RESPONSE_CODES.GET_TASK_ACK,
+                    Task = task,
+                    Errored = errored
+                };
+                _Common.WriteResPacketToResponse(resPacket, response);
+
+                if (taskId != string.Empty)
+                    taskStore.Remove(taskId);
+            }
+        }
+
+        private void UnregisterAssembly(RequestPacket requestPacket, HttpListenerResponse response)
+        {
+            //Not Implemented
+        }
+
+        private void UnregisterClient(HttpListenerRequest request, HttpListenerResponse response)
+        {
+            bool errored = false;
+            string key = request.RemoteEndPoint.ToString();
+            if (nodeList.ContainsKey(key))
+            {
+                string nodeName = nodeList[key];
+                nodeList.Remove(key);
+                nodeStatus.Remove(nodeName);
+            }
+            else
+                errored = true;
+
+            ResponsePacket resPacket = new ResponsePacket()
+            {
+                DateTimeStamp = DateTime.Now,
+                Code = RESPONSE_CODES.UNREGISTER_CLIENT_ACK,
+                Errored = errored
+            };
+            _Common.WriteResPacketToResponse(resPacket, response);
         }
 
         private void UpdateStatus(RequestPacket requestPacket, HttpListenerResponse response)
@@ -135,9 +206,11 @@ namespace ProjectCore
         private void SubmitTask(RequestPacket requestPacket, HttpListenerResponse response)
         {
 	        bool errored = false;
-	        if (nodeList.ContainsKey(requestPacket.Node))
+            int taskId = 0;
+	        if (nodeList.ContainsValue(requestPacket.Node))
 	        {
 		        taskStore.Add(requestPacket.Node,requestPacket.Task);
+                taskId = taskCtr++;
 	        }
 	        else
 	        {
@@ -147,6 +220,7 @@ namespace ProjectCore
 	        {
 		        DateTimeStamp = DateTime.Now,
 		        Code = RESPONSE_CODES.SUBMIT_TASK_ACK,
+                Response = taskId.ToString(),
 		        Errored = errored
 	        };
 	        _Common.WriteResPacketToResponse(resPacket, response);

@@ -20,8 +20,10 @@ namespace ProjectCore
             REGISTER_ASSEMBLY,
             UNREGISTER_CLIENT,
             UNREGISTER_ASSEMBLY,
-            RESULT,
-            TASK
+            GET_RESULT,
+            SUBMIT_TASK,
+            SUBMIT_RESULT,
+            GET_TASK
         };
 
         public enum RESPONSE_CODES
@@ -31,8 +33,10 @@ namespace ProjectCore
             REGISTER_ASSEMBLY_ACK,
             UNREGISTER_CLIENT_ACK,
             UNREGISTER_ASSEMBLY_ACK,
-            RESULT_ACK,
-            TASK_ACK
+            GET_RESULT_ACK,
+            SUBMIT_TASK_ACK,
+            SUBMIT_RESULT_ACK,
+            GET_TASK_ACK
         };
 
         public struct STATUS
@@ -51,6 +55,7 @@ namespace ProjectCore
         public struct Task
         {
             public string TaskId;
+            public string RequestingNode;
             public Assembly AssemblyDetails;
             public object Params;
         }
@@ -58,7 +63,7 @@ namespace ProjectCore
         public struct Assembly
         {
             public string AssemblyName;
-            public string AssemblyCode;
+            public byte[] AssemblyCode;
             public CODE_LANG CodeLang;
         }
 
@@ -69,6 +74,7 @@ namespace ProjectCore
             public Assembly AssemblyDetails;
             public REQUEST_CODES Code;
             public Task Task;
+            public Result Result;
             public STATUS Status;
         }
 
@@ -85,6 +91,7 @@ namespace ProjectCore
             public RESPONSE_CODES Code;
             public bool Errored;
             public string Response;
+            public Task Task;
             public Result Result;
         }
 
