@@ -290,7 +290,8 @@ namespace ProjectCore
 				{
 					DateTimeStamp = DateTime.Now,
 					Code = RESPONSE_CODES.REGISTER_CLIENT_ACK,
-					Errored = true
+					Errored = false,
+					Node=nodeList[request.RemoteEndPoint.ToString()]
 				};
 			}
 			_Common.WriteResPacketToResponse(resPacket, response);
