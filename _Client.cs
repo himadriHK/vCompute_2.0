@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
 using System.Security.Policy;
+using System.Threading;
 using System.Threading.Tasks;
 using CodeLoader;
 using static ProjectCore._Common;
@@ -12,13 +13,27 @@ namespace ProjectCore
 	class _Client
 	{
 		private string baseUrl = "http://localhost:8080/";
-		private string NodeName = string.Empty;
+		public string NodeName = string.Empty;
 		private CodeLoader.Loader codeLoader;
-		public _Client(string baseUrl)
+        private Queue<_Common.Task> taskQueue;
+        private bool _availableForTasks;
+        private TimeSpan _maxAwaitTime;
+        public _Client(string baseUrl)
 		{
-			this.baseUrl = baseUrl;
+            if(baseUrl != string.Empty)
+			    this.baseUrl = baseUrl;
 			codeLoader = new Loader(AppDomain.CurrentDomain.BaseDirectory + @"client.bin");
-		}
+            taskQueue = new Queue<_Common.Task>();
+            _availableForTasks = true;
+            _maxAwaitTime = new TimeSpan(0, 0, 30);
+
+            SyncAssemblies();
+
+            Thread sendStatus = new Thread(SendStatus);
+            sendStatus.Start();
+            Thread processTasks = new Thread(ProcessTasks);
+            processTasks.Start();
+        }
 
 		private async Task<ResponsePacket> SendRequesPacketAsync(RequestPacket request)
 		{
@@ -31,7 +46,7 @@ namespace ProjectCore
 			return result;
 		}
 
-		public async void RegisterClient()
+		public async Task<string> RegisterClient()
 		{
 			RequestPacket requestPacket =
 				new RequestPacket() { DateTimeStamp = DateTime.Now, Code = REQUEST_CODES.REGISTER_CLIENT };
@@ -39,15 +54,20 @@ namespace ProjectCore
 			ResponsePacket responsePacket = await SendRequesPacketAsync(requestPacket);
 
 			NodeName = responsePacket.Node;
+            return NodeName;
 		}
 
 		private async void SendStatus()
 		{
-			float[] perfCounter = getPerfCounter();
-			RequestPacket requestPacket =
-				new RequestPacket() { DateTimeStamp = DateTime.Now, Code = REQUEST_CODES.STATUS,Status = new STATUS(){CpuTime = perfCounter[0], RamUsage = perfCounter[1] } };
+            while (true)
+            {
+                double[] perfCounter = getPerfCounter();
+                RequestPacket requestPacket =
+                    new RequestPacket() { DateTimeStamp = DateTime.Now,Node=NodeName, Code = REQUEST_CODES.STATUS, Status = new STATUS() { CpuTime = perfCounter[0], RamUsage = perfCounter[1] } };
 
-			await SendRequesPacketAsync(requestPacket);
+                await SendRequesPacketAsync(requestPacket);
+                Thread.Sleep(2000);
+            }
 		}
 
 		private async void SyncAssemblies()
@@ -59,17 +79,100 @@ namespace ProjectCore
 			await SendRequesPacketAsync(requestPacket);
 		}
 
-		public async bool SubmitTask(string assemblyName, byte[] assemblyBytes, object param)
+        private async Task<bool> GetTasks()
+        {
+            RequestPacket requestPacket = new RequestPacket() { DateTimeStamp = DateTime.Now, Code = REQUEST_CODES.GET_TASK, Node = NodeName };
+            ResponsePacket responsePacket = await SendRequesPacketAsync(requestPacket);
+            if(!responsePacket.Errored)
+            {
+                lock (taskQueue)
+                {
+                    taskQueue.Enqueue(responsePacket.Task);
+                }
+                return true;
+            }
+
+            return false;
+        }
+
+        public async void ProcessTasks()
+        {
+            _Common.Task task;
+            while (_availableForTasks)
+            {
+                await GetTasks();
+                if (taskQueue.Count > 0)
+                {
+                    lock (taskQueue)
+                    {
+                        task = taskQueue.Dequeue();
+                    }
+                    SandboxExecute sandboxExecute = new SandboxExecute();
+                    object result = sandboxExecute.executeAssembly(task.AssemblyDetails.AssemblyName, codeLoader, task.Params);
+                    RequestPacket requestPacket = new RequestPacket()
+                    {
+                        DateTimeStamp = DateTime.Now,
+                        Code = REQUEST_CODES.SUBMIT_RESULT,
+                        Node = NodeName,
+                        Result = new Result()
+                        {
+                            ResultData = result,
+                            TaskId = task.TaskId
+                        }
+                    };
+                    await SendRequesPacketAsync(requestPacket);
+                }
+
+                Thread.Sleep(500);
+            }
+        }
+
+        public object GetResult(string taskId)
+        {
+            RequestPacket requestPacket = new RequestPacket()
+            {
+                DateTimeStamp = DateTime.Now,
+                Node = NodeName,
+                Code = REQUEST_CODES.GET_RESULT,
+                Task = new _Common.Task() { TaskId = taskId }
+            };
+
+            ResponsePacket responsePacket;
+            Stopwatch stopwatch = new Stopwatch();
+            stopwatch.Start();
+
+            do
+            {
+                responsePacket = SendRequesPacketAsync(requestPacket).GetAwaiter().GetResult();
+            }
+            while (responsePacket.Errored || stopwatch.Elapsed == _maxAwaitTime);
+
+            return responsePacket.Result.ResultData;
+        }
+
+		public async Task<string> SubmitTask(string assemblyName, byte[] assemblyBytes, object param)
 		{
 			if(assemblyBytes == null)
 			assemblyBytes = codeLoader.codeDictionary.ReadAssembly(assemblyName);
 
-			if (assemblyBytes == null)
-				return false;
+            if (assemblyBytes == null)
+                return string.Empty;
+            else
+                codeLoader.codeDictionary.WriteAssembly(assemblyName, assemblyBytes);
 
+            RequestPacket request = new RequestPacket()
+            {
+                DateTimeStamp = DateTime.Now,
+                Node = NodeName,
+                Code = REQUEST_CODES.SUBMIT_TASK,
+                Task = new _Common.Task() { AssemblyDetails = new Assembly() { AssemblyName = assemblyName, AssemblyCode = assemblyBytes } }
+            };
 
+            ResponsePacket response = await SendRequesPacketAsync(request);
+            string taskId = (response.Errored)?string.Empty:response.Task.TaskId;
+            return taskId;
 		}
-		private float[] getPerfCounter()
+		private double[] getPerfCounter()
 		{
 
 			PerformanceCounter cpuCounter = new PerformanceCounter();
@@ -78,18 +181,15 @@ namespace ProjectCore
 			cpuCounter.InstanceName = "_Total";
 
 			PerformanceCounter ramCounter = new PerformanceCounter("Memory", "% Committed Bytes In Use");
+            
+			ramCounter.NextValue();
+            cpuCounter.NextValue();
+			System.Threading.Thread.Sleep(500);
 
+			double cpusecondValue = Math.Round(cpuCounter.NextValue(),2);
+			double ramsecondValue = Math.Round(ramCounter.NextValue(),2);
 
-			dynamic ramfirstValue = ramCounter.NextValue();
-
-
-			dynamic cpufirstValue = cpuCounter.NextValue();
-			System.Threading.Thread.Sleep(50);
-
-			dynamic cpusecondValue = cpuCounter.NextValue();
-			dynamic ramsecondValue = ramCounter.NextValue();
-
-			return new float[] { cpusecondValue, ramsecondValue };
+			return new double[] { cpusecondValue, ramsecondValue };
 
 		}
 

@@ -141,7 +141,7 @@ namespace ProjectCore
 
 		public static ResponsePacket GetResponsePacket(string resPacket)
 		{
-			return (ResponsePacket)Newtonsoft.Json.JsonSerializer.Create().Deserialize(new StringReader(resPacket), typeof(RequestPacket));
+			return (ResponsePacket)Newtonsoft.Json.JsonSerializer.Create().Deserialize(new StringReader(resPacket), typeof(ResponsePacket));
 		}
 	}
 }

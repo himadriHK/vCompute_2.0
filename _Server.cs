@@ -5,6 +5,7 @@ using System.Net;
 using System.Linq;
 using System.Threading;
 using static ProjectCore._Common;
+using System.Diagnostics;
 
 namespace ProjectCore
 {
@@ -25,6 +26,8 @@ namespace ProjectCore
 			Endpoint = "http://localhost:8080/";
 			Stop = false;
 			nodeList = new Dictionary<string, string>();
+            nodeStatus = new Dictionary<string, double>();
+            taskStore = new Dictionary<string, Task>();
 			resultStore = new Dictionary<string, object>();
 			codeLoader = new CodeLoader.Loader(AppDomain.CurrentDomain.BaseDirectory + @"server.bin");
 			assemblyTracker = new Dictionary<string, HashSet<string>>();
@@ -193,6 +196,8 @@ namespace ProjectCore
 				{
 					nodeStatus.Add(requestPacket.Node, ((requestPacket.Status.CpuTime + requestPacket.Status.RamUsage) / 2));
 				}
+
+                Debug.WriteLine(requestPacket.Status.CpuTime + "  " + requestPacket.Status.RamUsage);
 			}
 			else
 			{
@@ -283,6 +288,7 @@ namespace ProjectCore
 					Code = RESPONSE_CODES.REGISTER_CLIENT_ACK,
 					Node = newNodeName
 				};
+                nodeList.Add(request.RemoteEndPoint.ToString(), newNodeName);
 			}
 			else
 			{

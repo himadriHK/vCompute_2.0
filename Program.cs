@@ -11,15 +11,11 @@ namespace ProjectCore
         static void Main(string[] args)
         {
             _Server server = new _Server();
-            _Client client = new _Client();
+            _Client client = new _Client(string.Empty);
             string str = "No result";
-            Task.Run(async () =>
-            {
-                server.Start();
-                str = await client.SendRequest();
-            }).GetAwaiter().GetResult();
-            
-            Console.WriteLine(str);
+            server.Start();
+            client.RegisterClient().Wait();
+            Console.WriteLine(client.NodeName);
             Console.Read();
         }
     }

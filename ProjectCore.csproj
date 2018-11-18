@@ -51,6 +51,7 @@
     <Compile Include="CodeLoader.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="SandboxExecute.cs" />
     <Compile Include="_Client.cs" />
     <Compile Include="_Common.cs" />
     <Compile Include="_Server.cs" />
