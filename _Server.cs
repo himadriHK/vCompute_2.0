@@ -9,7 +9,7 @@ using System.Diagnostics;
 
 namespace ProjectCore
 {
-	class _Server
+	public class _Server
 	{
 		public string Endpoint { get; set; }
 		public bool Stop { get; set; }
@@ -131,10 +131,10 @@ namespace ProjectCore
 			string taskId = string.Empty;
 			lock (taskStore)
 			{
-				if (taskStore.Any(x => x.Value.RequestingNode != requestPacket.Node))
-				{
-					taskId = taskStore.First(x => x.Value.RequestingNode != requestPacket.Node).Key;
-					task = taskStore[taskId];
+				if (taskStore.Any()) //x => x.Value.RequestingNode != requestPacket.Node
+                {
+					taskId = taskStore.First().Key; //x => x.Value.RequestingNode != requestPacket.Node
+                    task = taskStore[taskId];
 					if (assemblyTracker.ContainsKey(requestPacket.Node) && !assemblyTracker[requestPacket.Node]
 						    .Contains(requestPacket.Task.AssemblyDetails.AssemblyName))
 						task.AssemblyDetails.AssemblyCode = codeLoader.codeDictionary.ReadAssembly(task.AssemblyDetails.AssemblyName);
@@ -243,8 +243,9 @@ namespace ProjectCore
 			{
 				lock (taskStore)
 				{
-					taskStore.Add(requestPacket.Node, requestPacket.Task);
-					taskId = taskCtr++;
+                    taskId = taskCtr++;
+                    requestPacket.Task.TaskId = taskId.ToString();
+                    taskStore.Add(requestPacket.Node, requestPacket.Task);
 				}
 			}
 			else
@@ -256,6 +257,7 @@ namespace ProjectCore
 				DateTimeStamp = DateTime.Now,
 				Code = RESPONSE_CODES.SUBMIT_TASK_ACK,
 				Response = taskId.ToString(),
+                Task=new Task() { TaskId=taskId.ToString()},
 				Errored = errored
 			};
 			_Common.WriteResPacketToResponse(resPacket, response);

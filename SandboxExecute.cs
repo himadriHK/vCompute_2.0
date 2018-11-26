@@ -23,7 +23,7 @@ namespace ProjectCore
 			ads.ApplicationBase = AppDomain.CurrentDomain.BaseDirectory;
 			AppDomain tempDomain = AppDomain.CreateDomain(assemblyName + new Random().NextDouble(), e, ads, permSet, null);
 
-			tempDomain.Load("CodeLoader");
+			tempDomain.Load("CodeInterface");
 
 			ObjectHandle handle = Activator.CreateInstanceFrom(tempDomain, typeof(Sandboxer).Assembly.ManifestModule.FullyQualifiedName, typeof(Sandboxer).FullName);
 
@@ -42,11 +42,11 @@ namespace ProjectCore
 		public object ExecuteNewAssembly(byte[] rawAssm, object param)
 		{
 			Assembly asm = Assembly.Load(rawAssm);
-			CodeInterface assemblyObj = null;
+			CodeInterface.CodeInterface assemblyObj = null;
 
 			foreach (Type t in asm.GetTypes())
 				if (t.GetInterface("CodeInterface") != null)
-					assemblyObj = (CodeInterface)Activator.CreateInstance(t);
+					assemblyObj = (CodeInterface.CodeInterface)Activator.CreateInstance(t);
 
 			object output = string.Empty;
 

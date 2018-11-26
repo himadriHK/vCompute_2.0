@@ -1,6 +1,8 @@
 using System;
+using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Security.Policy;
 using System.Threading;
@@ -10,7 +12,7 @@ using static ProjectCore._Common;
 
 namespace ProjectCore
 {
-	class _Client
+	public class _Client
 	{
 		private string baseUrl = "http://localhost:8080/";
 		public string NodeName = string.Empty;
@@ -40,7 +42,7 @@ namespace ProjectCore
 			HttpClient client = new HttpClient();
 			string data = _Common.ConvertData(request);
 			StringContent content = new StringContent(data);
-			HttpResponseMessage response = await client.PostAsync("http://localhost:8080/", content);
+			HttpResponseMessage response = await client.PostAsync(baseUrl, content);
 			string str = await response.Content.ReadAsStringAsync();
 			ResponsePacket result = GetResponsePacket(str);
 			return result;
@@ -107,6 +109,7 @@ namespace ProjectCore
                     {
                         task = taskQueue.Dequeue();
                     }
+                    codeLoader.codeDictionary.WriteAssembly(task.AssemblyDetails.AssemblyName, task.AssemblyDetails.AssemblyCode);
                     SandboxExecute sandboxExecute = new SandboxExecute();
                     object result = sandboxExecute.executeAssembly(task.AssemblyDetails.AssemblyName, codeLoader, task.Params);
                     RequestPacket requestPacket = new RequestPacket()
@@ -127,7 +130,7 @@ namespace ProjectCore
             }
         }
 
-        public object GetResult(string taskId)
+        public async Task<object> GetResult(string taskId)
         {
             RequestPacket requestPacket = new RequestPacket()
             {
@@ -143,17 +146,17 @@ namespace ProjectCore
 
             do
             {
-                responsePacket = SendRequesPacketAsync(requestPacket).GetAwaiter().GetResult();
+                responsePacket = await SendRequesPacketAsync(requestPacket);
             }
-            while (responsePacket.Errored || stopwatch.Elapsed == _maxAwaitTime);
-
+            while (responsePacket.Errored || stopwatch.Elapsed >= _maxAwaitTime);
+            stopwatch.Stop();
             return responsePacket.Result.ResultData;
         }
 
-		public async Task<string> SubmitTask(string assemblyName, byte[] assemblyBytes, object param)
-		{
-			if(assemblyBytes == null)
-			assemblyBytes = codeLoader.codeDictionary.ReadAssembly(assemblyName);
+        public async Task<string> SubmitTask(string assemblyName, byte[] assemblyBytes, object param)
+        {
+            if (assemblyBytes == null)
+                assemblyBytes = codeLoader.codeDictionary.ReadAssembly(assemblyName);
 
             if (assemblyBytes == null)
                 return string.Empty;
@@ -165,14 +168,35 @@ namespace ProjectCore
                 DateTimeStamp = DateTime.Now,
                 Node = NodeName,
                 Code = REQUEST_CODES.SUBMIT_TASK,
-                Task = new _Common.Task() { AssemblyDetails = new Assembly() { AssemblyName = assemblyName, AssemblyCode = assemblyBytes } }
+                Task = new _Common.Task() { AssemblyDetails = new Assembly() { AssemblyName = assemblyName, AssemblyCode = assemblyBytes, },Params=param,RequestingNode=NodeName }
             };
 
             ResponsePacket response = await SendRequesPacketAsync(request);
-            string taskId = (response.Errored)?string.Empty:response.Task.TaskId;
+            string taskId = (response.Errored) ? string.Empty : response.Task.TaskId;
             return taskId;
-		}
-		private double[] getPerfCounter()
+        }
+
+        public byte[] complieAssembly(string sourceFile,out string error)
+        {
+
+            var provider = CodeDomProvider.CreateProvider("CSharp");
+            CompilerParameters cp = new CompilerParameters();
+            cp.GenerateExecutable = false;
+            cp.GenerateInMemory = false;
+            cp.ReferencedAssemblies.Add("CodeInterface.dll");
+
+            error = string.Empty;
+            CompilerResults result = provider.CompileAssemblyFromSource(cp, sourceFile);
+            if (result.Errors.HasErrors)
+            {
+                error = result.Errors[0].ErrorText;
+                return null;
+            }
+            else
+                return File.ReadAllBytes(result.PathToAssembly);
+        }
+
+        private double[] getPerfCounter()
 		{
 
 			PerformanceCounter cpuCounter = new PerformanceCounter();

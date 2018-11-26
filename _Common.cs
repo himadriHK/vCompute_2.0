@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace ProjectCore
 {
-	static class _Common
+	public static class _Common
 	{
 		const string SUCCESS = "Success";
 		const string FAILURE = "Failure";
