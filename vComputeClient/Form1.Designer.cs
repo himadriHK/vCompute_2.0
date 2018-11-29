@@ -34,10 +34,10 @@
             this.assemblyCodeParams = new System.Windows.Forms.RichTextBox();
             this.assemblyCode = new System.Windows.Forms.RichTextBox();
             this.tabPage2 = new System.Windows.Forms.TabPage();
+            this.assemblyParams = new System.Windows.Forms.RichTextBox();
+            this.assemblyList = new System.Windows.Forms.ListBox();
             this.execute = new System.Windows.Forms.Button();
             this.notifList = new System.Windows.Forms.TextBox();
-            this.assemblyList = new System.Windows.Forms.ListBox();
-            this.assemblyParams = new System.Windows.Forms.RichTextBox();
             this.tabControl1.SuspendLayout();
             this.tabPage1.SuspendLayout();
             this.tabPage2.SuspendLayout();
@@ -105,6 +105,22 @@
             this.tabPage2.Text = "Saved Assembly";
             this.tabPage2.UseVisualStyleBackColor = true;
             // 
+            // assemblyParams
+            // 
+            this.assemblyParams.Location = new System.Drawing.Point(262, 3);
+            this.assemblyParams.Name = "assemblyParams";
+            this.assemblyParams.Size = new System.Drawing.Size(500, 342);
+            this.assemblyParams.TabIndex = 1;
+            this.assemblyParams.Text = "";
+            // 
+            // assemblyList
+            // 
+            this.assemblyList.FormattingEnabled = true;
+            this.assemblyList.Location = new System.Drawing.Point(0, 3);
+            this.assemblyList.Name = "assemblyList";
+            this.assemblyList.Size = new System.Drawing.Size(256, 342);
+            this.assemblyList.TabIndex = 0;
+            // 
             // execute
             // 
             this.execute.Location = new System.Drawing.Point(12, 406);
@@ -122,22 +138,6 @@
             this.notifList.Name = "notifList";
             this.notifList.Size = new System.Drawing.Size(653, 118);
             this.notifList.TabIndex = 3;
-            // 
-            // assemblyList
-            // 
-            this.assemblyList.FormattingEnabled = true;
-            this.assemblyList.Location = new System.Drawing.Point(0, 3);
-            this.assemblyList.Name = "assemblyList";
-            this.assemblyList.Size = new System.Drawing.Size(256, 342);
-            this.assemblyList.TabIndex = 0;
-            // 
-            // assemblyParams
-            // 
-            this.assemblyParams.Location = new System.Drawing.Point(262, 3);
-            this.assemblyParams.Name = "assemblyParams";
-            this.assemblyParams.Size = new System.Drawing.Size(500, 342);
-            this.assemblyParams.TabIndex = 1;
-            this.assemblyParams.Text = "";
             // 
             // Form1
             // 
